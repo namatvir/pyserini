@@ -109,7 +109,7 @@ class ClipTextEncoder(BaseClipEncoder):
         with torch.no_grad():
             text_features = self.model.get_text_features(**inputs)
 
-        embeddings = text_features.detach().cpu().numpy()
+        embeddings = text_features.pooler_output.detach().cpu().numpy()
         return self.normalize_embeddings(embeddings)
     
     

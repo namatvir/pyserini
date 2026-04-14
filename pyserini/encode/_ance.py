@@ -18,15 +18,19 @@ from typing import Optional, List
 
 import torch
 from transformers import PreTrainedModel, RobertaConfig, RobertaModel, RobertaTokenizer, requires_backends
+from transformers.utils import cached_file
 
 from pyserini.encode import DocumentEncoder, QueryEncoder
 
 
 class AnceEncoder(PreTrainedModel):
     config_class = RobertaConfig
-    base_model_prefix = 'ance_encoder'
+    base_model_prefix = 'roberta'
     load_tf_weights = None
-
+    @property
+    def all_tied_weights_keys(self):
+        return {}
+    
     def __init__(self, config: RobertaConfig):
         requires_backends(self, 'torch')
         super().__init__(config)
@@ -74,6 +78,17 @@ class AnceDocumentEncoder(DocumentEncoder):
     def __init__(self, model_name, tokenizer_name=None, device='cuda:0'):
         self.device = device
         self.model = AnceEncoder.from_pretrained(model_name)
+        # Manually load embeddingHead and norm weights for transformers 5.x compatibility
+        weights_path = cached_file(model_name, 'pytorch_model.bin')
+        state_dict = torch.load(weights_path, map_location='cpu', weights_only=True)
+        self.model.embeddingHead.load_state_dict({
+            'weight': state_dict['embeddingHead.weight'],
+            'bias': state_dict['embeddingHead.bias']
+            })
+        self.model.norm.load_state_dict({
+            'weight': state_dict['norm.weight'],
+            'bias': state_dict['norm.bias']
+            })
         self.model.to(self.device)
         self.tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name or model_name,
                                                           clean_up_tokenization_spaces=True)
@@ -100,6 +115,18 @@ class AnceQueryEncoder(QueryEncoder):
         if encoder_dir:
             self.device = device
             self.model = AnceEncoder.from_pretrained(encoder_dir)
+            self.model = AnceEncoder.from_pretrained(encoder_dir)
+# Manually load embeddingHead and norm weights for transformers 5.x compatibility
+            weights_path = cached_file(encoder_dir, 'pytorch_model.bin')
+            state_dict = torch.load(weights_path, map_location='cpu', weights_only=True)
+            self.model.embeddingHead.load_state_dict({
+                'weight': state_dict['embeddingHead.weight'],
+                'bias': state_dict['embeddingHead.bias']
+            })
+            self.model.norm.load_state_dict({
+                'weight': state_dict['norm.weight'],
+                'bias': state_dict['norm.bias']
+            })
             self.model.to(self.device)
             self.tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name or encoder_dir,
                                                               clean_up_tokenization_spaces=True)

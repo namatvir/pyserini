@@ -21,6 +21,7 @@ import torch
 if torch.cuda.is_available():
     from torch.cuda.amp import autocast
 from transformers import BertConfig, BertModel, BertTokenizer, PreTrainedModel
+from transformers.utils import cached_file
 
 from pyserini.encode import DocumentEncoder, QueryEncoder
 
@@ -29,6 +30,9 @@ class UniCoilEncoder(PreTrainedModel):
     config_class = BertConfig
     base_model_prefix = 'coil_encoder'
     load_tf_weights = None
+    @property
+    def all_tied_weights_keys(self):
+        return {}
 
     def __init__(self, config: BertConfig):
         super().__init__(config)
@@ -78,6 +82,12 @@ class UniCoilDocumentEncoder(DocumentEncoder):
     def __init__(self, model_name, tokenizer_name=None, device='cuda:0'):
         self.device = device
         self.model = UniCoilEncoder.from_pretrained(model_name)
+        weights_path = cached_file(model_name, 'pytorch_model.bin')
+        state_dict = torch.load(weights_path, map_location='cpu', weights_only=True)
+        self.model.tok_proj.load_state_dict({
+            'weight': state_dict['coil_encoder.tok_proj.weight'],
+            'bias': state_dict['coil_encoder.tok_proj.bias']
+            })
         self.model.to(self.device)
         self.tokenizer = BertTokenizer.from_pretrained(tokenizer_name or model_name, clean_up_tokenization_spaces=True)
 
@@ -143,6 +153,12 @@ class UniCoilQueryEncoder(QueryEncoder):
     def __init__(self, model_name_or_path, tokenizer_name=None, device='cpu'):
         self.device = device
         self.model = UniCoilEncoder.from_pretrained(model_name_or_path)
+        weights_path = cached_file(model_name_or_path, 'pytorch_model.bin')
+        state_dict = torch.load(weights_path, map_location='cpu', weights_only=True)
+        self.model.tok_proj.load_state_dict({
+            'weight': state_dict['coil_encoder.tok_proj.weight'],
+            'bias': state_dict['coil_encoder.tok_proj.bias']
+            })
         self.model.to(self.device)
         self.tokenizer = BertTokenizer.from_pretrained(tokenizer_name or model_name_or_path)
         self.weight_range = 5
