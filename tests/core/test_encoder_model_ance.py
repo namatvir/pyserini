@@ -51,7 +51,14 @@ class TestEncodeAnce(unittest.TestCase):
             encoded_vector = np.array(encoder.encode(topics[t]['title']))
 
             l1 = np.sum(np.abs(cached_vector - encoded_vector))
+            # print(f'l1 values is {l1}')
             self.assertTrue(l1 < 0.0005)
+
+    def test_ance_weights_loaded(self):
+        encoder = AnceQueryEncoder('castorini/ance-msmarco-passage')
+        norm_weights = encoder.model.norm.weight.detach().cpu().numpy()
+        self.assertFalse(np.allclose(norm_weights, np.ones_like(norm_weights)),
+            "norm weights appear to be default initialized, not loaded from checkpoint")
 
 
 if __name__ == '__main__':

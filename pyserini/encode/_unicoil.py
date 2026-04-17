@@ -30,6 +30,7 @@ class UniCoilEncoder(PreTrainedModel):
     config_class = BertConfig
     base_model_prefix = 'coil_encoder'
     load_tf_weights = None
+    
     @property
     def all_tied_weights_keys(self):
         return {}

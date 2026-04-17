@@ -109,6 +109,8 @@ class ClipTextEncoder(BaseClipEncoder):
         with torch.no_grad():
             text_features = self.model.get_text_features(**inputs)
 
+        # In transformers 5.x, get_text_features() returns BaseModelOutputWithPooling
+        # instead of a tensor directly; use pooler_output to get the text embeddings
         embeddings = text_features.pooler_output.detach().cpu().numpy()
         return self.normalize_embeddings(embeddings)
     
