@@ -24,6 +24,8 @@ from transformers import BertConfig, BertModel, BertTokenizer, PreTrainedModel
 from transformers.utils import cached_file
 
 from pyserini.encode import DocumentEncoder, QueryEncoder
+from packaging.version import Version
+from transformers import __version__ as transformers_version
 
 
 class UniCoilEncoder(PreTrainedModel):
@@ -78,17 +80,24 @@ class UniCoilEncoder(PreTrainedModel):
         tok_weights = torch.relu(tok_weights)
         return tok_weights
 
+def load_head_weights(model, model_name, weight_map):
+    weights_path = cached_file(model_name, 'pytorch_model.bin')
+    state_dict = torch.load(weights_path, map_location='cpu', weights_only=True)
+    for module_name, keys in weight_map.items():
+        module = getattr(model, module_name)
+        module.load_state_dict({k: state_dict[v] for k, v in keys.items()})
 
 class UniCoilDocumentEncoder(DocumentEncoder):
     def __init__(self, model_name, tokenizer_name=None, device='cuda:0'):
         self.device = device
         self.model = UniCoilEncoder.from_pretrained(model_name)
-        weights_path = cached_file(model_name, 'pytorch_model.bin')
-        state_dict = torch.load(weights_path, map_location='cpu', weights_only=True)
-        self.model.tok_proj.load_state_dict({
-            'weight': state_dict['coil_encoder.tok_proj.weight'],
-            'bias': state_dict['coil_encoder.tok_proj.bias']
-            })
+        if Version(transformers_version) >= Version("5.0.0"):
+            load_head_weights(self.model, model_name, {
+                'tok_proj': {
+                    'weight': 'coil_encoder.tok_proj.weight',
+                    'bias': 'coil_encoder.tok_proj.bias'
+                }
+            }) 
         self.model.to(self.device)
         self.tokenizer = BertTokenizer.from_pretrained(tokenizer_name or model_name, clean_up_tokenization_spaces=True)
 
@@ -154,11 +163,12 @@ class UniCoilQueryEncoder(QueryEncoder):
     def __init__(self, model_name_or_path, tokenizer_name=None, device='cpu'):
         self.device = device
         self.model = UniCoilEncoder.from_pretrained(model_name_or_path)
-        weights_path = cached_file(model_name_or_path, 'pytorch_model.bin')
-        state_dict = torch.load(weights_path, map_location='cpu', weights_only=True)
-        self.model.tok_proj.load_state_dict({
-            'weight': state_dict['coil_encoder.tok_proj.weight'],
-            'bias': state_dict['coil_encoder.tok_proj.bias']
+        if Version(transformers_version) >= Version("5.0.0"):
+            load_head_weights(self.model, model_name_or_path, {
+                'tok_proj': {
+                    'weight': 'coil_encoder.tok_proj.weight',
+                    'bias': 'coil_encoder.tok_proj.bias'
+                }
             })
         self.model.to(self.device)
         self.tokenizer = BertTokenizer.from_pretrained(tokenizer_name or model_name_or_path)

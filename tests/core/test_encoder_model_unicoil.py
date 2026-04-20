@@ -93,8 +93,11 @@ class TestEncodeUniCoil(unittest.TestCase):
     def test_unicoil_weights_loaded(self):
         encoder = UniCoilDocumentEncoder('castorini/unicoil-msmarco-passage', device='cpu')
         tok_proj_weights = encoder.model.tok_proj.weight.detach().cpu().numpy()
+        tok_proj_weights_bias = encoder.model.tok_proj.bias.detach().cpu().numpy()
         self.assertFalse(np.allclose(tok_proj_weights, np.zeros_like(tok_proj_weights)),
                      "tok_proj weights appear to be default initialized, not loaded from checkpoint")
+        self.assertFalse(np.allclose(tok_proj_weights_bias, np.zeros_like(tok_proj_weights_bias)),
+                     "tok_proj bias appear to be default initialized, not loaded from checkpoint")
 
 
 if __name__ == '__main__':
