@@ -28,6 +28,18 @@ from packaging.version import Version
 from transformers import __version__ as transformers_version
 
 
+def _load_unicoil_model(model_name_or_path: str, device: str):
+    model = UniCoilEncoder.from_pretrained(model_name_or_path)
+    if Version(transformers_version) >= Version("5.0.0"):
+        load_head_weights(model, model_name_or_path, {
+            'tok_proj': {
+                'weight': 'coil_encoder.tok_proj.weight',
+                'bias': 'coil_encoder.tok_proj.bias'
+            }
+        })
+    model.to(device)
+    return model
+
 class UniCoilEncoder(PreTrainedModel):
     config_class = BertConfig
     base_model_prefix = 'coil_encoder'
@@ -83,15 +95,7 @@ class UniCoilEncoder(PreTrainedModel):
 class UniCoilDocumentEncoder(DocumentEncoder):
     def __init__(self, model_name, tokenizer_name=None, device='cuda:0'):
         self.device = device
-        self.model = UniCoilEncoder.from_pretrained(model_name)
-        if Version(transformers_version) >= Version("5.0.0"):
-            load_head_weights(self.model, model_name, {
-                'tok_proj': {
-                    'weight': 'coil_encoder.tok_proj.weight',
-                    'bias': 'coil_encoder.tok_proj.bias'
-                }
-            }) 
-        self.model.to(self.device)
+        self.model = _load_unicoil_model(model_name, device)
         self.tokenizer = BertTokenizer.from_pretrained(tokenizer_name or model_name, clean_up_tokenization_spaces=True)
 
     def encode(self, texts, titles=None, expands=None, fp16=False,  max_length=512, **kwargs):
@@ -155,15 +159,7 @@ class UniCoilDocumentEncoder(DocumentEncoder):
 class UniCoilQueryEncoder(QueryEncoder):
     def __init__(self, model_name_or_path, tokenizer_name=None, device='cpu'):
         self.device = device
-        self.model = UniCoilEncoder.from_pretrained(model_name_or_path)
-        if Version(transformers_version) >= Version("5.0.0"):
-            load_head_weights(self.model, model_name_or_path, {
-                'tok_proj': {
-                    'weight': 'coil_encoder.tok_proj.weight',
-                    'bias': 'coil_encoder.tok_proj.bias'
-                }
-            })
-        self.model.to(self.device)
+        self.model = _load_unicoil_model(model_name_or_path, device)
         self.tokenizer = BertTokenizer.from_pretrained(tokenizer_name or model_name_or_path)
         self.weight_range = 5
         self.quant_range = 256

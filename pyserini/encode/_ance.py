@@ -25,6 +25,22 @@ from packaging.version import Version
 from transformers import __version__ as transformers_version
 
 
+def _load_ance_model(model_name_or_path: str, device: str):
+    model = AnceEncoder.from_pretrained(model_name_or_path)
+    if Version(transformers_version) >= Version("5.0.0"):
+        load_head_weights(model, model_name_or_path, {
+            'embeddingHead': {
+                'weight': 'embeddingHead.weight',
+                'bias': 'embeddingHead.bias'
+            },
+            'norm': {
+                'weight': 'norm.weight',
+                'bias': 'norm.bias'
+            }
+        })
+    model.to(device)
+    return model
+
 class AnceEncoder(PreTrainedModel):
     config_class = RobertaConfig
     base_model_prefix = 'ance_encoder'
@@ -79,19 +95,7 @@ class AnceEncoder(PreTrainedModel):
 class AnceDocumentEncoder(DocumentEncoder):
     def __init__(self, model_name, tokenizer_name=None, device='cuda:0'):
         self.device = device
-        self.model = AnceEncoder.from_pretrained(model_name)
-        if Version(transformers_version) >= Version("5.0.0"):
-            load_head_weights(self.model, model_name, {
-                'embeddingHead': {
-                    'weight': 'embeddingHead.weight',
-                    'bias': 'embeddingHead.bias'
-                },
-                'norm': {
-                    'weight': 'norm.weight',
-                    'bias': 'norm.bias'
-                }
-            })
-        self.model.to(self.device)
+        self.model = _load_ance_model(model_name, device)
         self.tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name or model_name,
                                                           clean_up_tokenization_spaces=True)
 
@@ -116,19 +120,7 @@ class AnceQueryEncoder(QueryEncoder):
         super().__init__(encoded_query_dir)
         if encoder_dir:
             self.device = device
-            self.model = AnceEncoder.from_pretrained(encoder_dir)
-            if Version(transformers_version) >= Version("5.0.0"):
-                load_head_weights(self.model, encoder_dir, {
-                    'embeddingHead': {
-                        'weight': 'embeddingHead.weight',
-                        'bias': 'embeddingHead.bias'
-                    },
-                    'norm': {
-                        'weight': 'norm.weight',
-                        'bias': 'norm.bias'
-                    }
-                })
-            self.model.to(self.device)
+            self.model = _load_ance_model(encoder_dir, device)
             self.tokenizer = RobertaTokenizer.from_pretrained(tokenizer_name or encoder_dir,
                                                               clean_up_tokenization_spaces=True)
             self.has_model = True
