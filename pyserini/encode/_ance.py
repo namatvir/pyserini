@@ -18,9 +18,9 @@ from typing import Optional, List
 
 import torch
 from transformers import PreTrainedModel, RobertaConfig, RobertaModel, RobertaTokenizer, requires_backends
-from transformers.utils import cached_file
 
 from pyserini.encode import DocumentEncoder, QueryEncoder
+from pyserini.encode._base import load_head_weights
 from packaging.version import Version
 from transformers import __version__ as transformers_version
 
@@ -75,13 +75,6 @@ class AnceEncoder(PreTrainedModel):
         pooled_output = sequence_output[:, 0, :]
         pooled_output = self.norm(self.embeddingHead(pooled_output))
         return pooled_output
-
-def load_head_weights(model, model_name, weight_map):
-    weights_path = cached_file(model_name, 'pytorch_model.bin')
-    state_dict = torch.load(weights_path, map_location='cpu', weights_only=True)
-    for module_name, keys in weight_map.items():
-        module = getattr(model, module_name)
-        module.load_state_dict({k: state_dict[v] for k, v in keys.items()})
 
 class AnceDocumentEncoder(DocumentEncoder):
     def __init__(self, model_name, tokenizer_name=None, device='cuda:0'):
